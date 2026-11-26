@@ -136,6 +136,17 @@ var MFI_FEATURE_DEFINITIONS = [
         installedFlag: '__innerUiKeyboardLayoutFixInstalled__',
     },
     {
+        id: 'keyboardWallpaperTint',
+        label: '键盘露底壁纸同色',
+        platforms: [MFI_PLATFORM_MOBILE],
+        defaultEnabled: false,
+        androidTauriOnly: true,
+        init: initKeyboardWallpaperTint,
+        initName: 'initKeyboardWallpaperTint',
+        destroyName: '__keyboardWallpaperTintDestroy__',
+        installedFlag: '__keyboardWallpaperTintInstalled__',
+    },
+    {
         id: 'chatExitConfirm',
         label: '返回主页面前确认',
         platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
@@ -178,6 +189,7 @@ var MFI_SETTING_GROUPS = [
             'pastePerformance',
             'externalKeyboard',
             'innerUiKeyboard',
+            'keyboardWallpaperTint',
         ],
     },
     {
@@ -212,6 +224,7 @@ var MFI_USAGE_HELP_GROUPS = [
             ['pastePerformance', '减少通过虚拟键盘粘贴大量文本时的延迟与卡顿。'],
             ['externalKeyboard', '外部浮窗应用唤起键盘时，ST 主界面不再被顶起。'],
             ['innerUiKeyboard', '在世界书、角色卡等界面中呼出键盘时，锁定底层主界面不被顶起，减少不必要的布局变动与卡顿。'],
+            ['keyboardWallpaperTint', '安卓版 TT 根据当前壁纸裁剪取色，同步网页和窗口露底颜色。纸月主题开启壁纸同步或启用纯黑背景时，交还底色控制。'],
         ],
     },
     {
@@ -455,7 +468,9 @@ function getFeatureDefinition(featureId) {
 }
 
 function isFeatureAvailable(definition) {
-    return window.__TAURITAVERN_HOST__ ? !definition.sillyTavernOnly : !definition.tauriTavernOnly;
+    const host = window.__TAURITAVERN_HOST__;
+    if (definition.androidTauriOnly) return host?.platform === 'android';
+    return host ? !definition.sillyTavernOnly : !definition.tauriTavernOnly;
 }
 
 function getPlatformControlText(platform, featureLabel) {
@@ -4611,6 +4626,25 @@ function initGenerationConfirmGuard() {
 // ============================================================
 // 扩展入口
 // ============================================================
+
+function initKeyboardWallpaperTint() {
+    window.__keyboardWallpaperTintInstalled__ = true;
+    let active = true;
+    let stop;
+    function destroy() {
+        active = false;
+        stop?.();
+        window.__keyboardWallpaperTintInstalled__ = false;
+    }
+    window.__keyboardWallpaperTintDestroy__ = destroy;
+    import('./keyboard-wallpaper-tint.js').then(function (module) {
+        if (active) stop = module.startKeyboardWallpaperTint();
+    }).catch(function (error) {
+        if (!active) return;
+        destroy();
+        console.warn('[MobileFocus] 无法启用键盘壁纸底色', error);
+    });
+}
 
 function isFeatureRuntimeInstalled(definition) {
     return !!window[definition.installedFlag];
