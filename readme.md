@@ -16,6 +16,8 @@
 
 使用千机伞的「QR 重新生成」和「QR 回退输入」时，可开启移动端「重新生成/备选回复/回退输入确认」。回退确认通过后，千机伞撤回最后一条用户消息及其后的回复，并把用户原文放回输入框，等待手动发送。草稿、附件和生成状态仍按千机伞原有规则检查。
 
+开启同一开关后，千机伞适配版 0.1.7 的「发送旁重 roll」也会在操作前确认。单击重新生成，双击撤回最后一轮并重新发送，长按撤回后回填修改。 [安装千机伞适配版](https://github.com/kaelisvespera/ST-MyriadUmbrella)
+
 适配基线为 TT 2.4.0 热修版 [`fff9af0`](https://github.com/Darkatse/TauriTavern/releases/tag/v2.4.0)。原项目见 [akira59851/Mobile-Focus-Interceptor](https://github.com/akira59851/Mobile-Focus-Interceptor)。
 
 ## SillyTavern 功能
@@ -56,6 +58,11 @@
 - 仅适用于移动端的功能不会在电脑端加载。
 
 ## 更新日志
+
+### [v1.4.1-tt.4]
+
+- 在执行千机伞两条 QR 命令前确认，覆盖第三方 QR 助手转发。
+- 接入适配版千机伞发送旁重 roll 的单击、双击和长按确认。
 
 ### [v1.4.1-tt.3]
 

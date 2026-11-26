@@ -228,7 +228,7 @@ var MFI_USAGE_HELP_GROUPS = [
         items: [
             ['chatExitConfirm', '从聊天返回主页面时弹出确认，适用于系统返回和菜单中的关闭聊天。'],
             ['exitConfirm', '刷新、关闭或侧滑返回前弹窗确认，防止误触导致页面重载。'],
-            ['generationConfirm', '重新生成、生成备选回复或使用千机伞回退输入前弹窗确认。'],
+            ['generationConfirm', '重新生成、生成备选回复或使用千机伞回退输入前弹窗确认。适配版千机伞的发送旁重 roll 也由此开关控制。'],
         ],
     },
 ];
@@ -4083,7 +4083,7 @@ function mfiWillRightSwipeGenerate(respectAvailability) {
     return overswipeBehavior === 'regenerate';
 }
 
-/** 识别会触发重新生成、新备选生成或千机伞回退输入的斜线命令。 */
+/** 识别原生重新生成和备选生成命令。千机伞的命令在执行前确认。 */
 function mfiGetActionToConfirm(text) {
     const source = String(text ?? '').trim();
     if (!source.startsWith('/')) {
@@ -4097,11 +4097,8 @@ function mfiGetActionToConfirm(text) {
             continue;
         }
         const commandName = commandMatch[1].toLowerCase();
-        if (commandName === 'regenerate' || commandName === 'regen' || commandName === 'tt-reroll') {
+        if (commandName === 'regenerate' || commandName === 'regen') {
             return 'regenerate';
-        }
-        if (commandName === 'tt-retract') {
-            return 'retract';
         }
         if (commandName === 'swipe') {
             const directionMatch = /\bdirection\s*=\s*(?:"(left|right)"|'(left|right)'|(left|right))(?=\s|$)/i.exec(segment);
@@ -4136,6 +4133,60 @@ function mfiTrackRetractionTarget(context) {
             && chat?.at(-1) === last && last?.mes === lastText
             && chat?.findLast?.(message => message?.is_user) === userMessage && userMessage?.mes === userText
             && document.getElementById('send_textarea') === composer && composer?.value === draft;
+    };
+}
+
+/** 挂到已注册的两条千机伞命令，覆盖 QR 助手绕过 DOM 按钮的执行路径。 */
+function mfiInstallUmbrellaCommandGuard(confirmAction, automaticScopes) {
+    const context = getStContext();
+    const commands = context?.SlashCommandParser?.commands;
+    if (!commands) {
+        return null;
+    }
+
+    const wrappedCommands = new Map();
+    const commandActions = [['tt-reroll', 'regenerate'], ['tt-retract', 'retract']];
+    const settingsLoaded = context.eventTypes?.EXTENSION_SETTINGS_LOADED;
+    let active = true;
+
+    function syncCommands() {
+        if (!active) return;
+        for (const [name, action] of commandActions) {
+            const command = commands[name];
+            if (typeof command?.callback !== 'function' || wrappedCommands.has(command)) continue;
+
+            const original = command.callback;
+            const wrapped = async function (args, value) {
+                if (!active || args?._debugController) return original.call(this, args, value);
+                for (let scope = args?._scope; scope; scope = scope.parent) {
+                    if (automaticScopes.has(scope)) return original.call(this, args, value);
+                }
+
+                const abortController = args?._abortController;
+                if (abortController?.signal?.aborted) return '';
+                const confirmed = await confirmAction(action);
+                if (abortController?.signal?.aborted) return '';
+                if (!active || !confirmed) {
+                    abortController?.abort('已取消千机伞操作', true);
+                    return '';
+                }
+                return original.call(this, args, value);
+            };
+
+            wrappedCommands.set(command, { original, wrapped });
+            command.callback = wrapped;
+        }
+    }
+
+    syncCommands();
+    if (settingsLoaded) context.eventSource?.on(settingsLoaded, syncCommands);
+
+    return function () {
+        active = false;
+        if (settingsLoaded) context.eventSource?.removeListener(settingsLoaded, syncCommands);
+        for (const [command, { original, wrapped }] of wrappedCommands) {
+            if (command.callback === wrapped) command.callback = original;
+        }
     };
 }
 
@@ -4236,7 +4287,7 @@ function mfiMarkQuickReplyUserIntent(event) {
 }
 
 /** 安装 ST 自带快捷回复的窄入口包装，只处理用户本次主动执行。 */
-function mfiInstallQuickReplyGuard() {
+function mfiInstallQuickReplyGuard(automaticScopes) {
     const epoch = ++mfiQuickReplyGuardEpoch;
     mfiQuickReplyGuardActive = true;
 
@@ -4260,7 +4311,16 @@ function mfiInstallQuickReplyGuard() {
                 if (!mfiQuickReplyGuardActive) {
                     return original.call(this, qr, options);
                 }
-                if (options.isAutoExecute || options.isEditor || performance.now() > mfiQuickReplyUserIntentUntil) {
+                if (options.isAutoExecute || options.isEditor) {
+                    if (!options.scope) return original.call(this, qr, options);
+                    automaticScopes.add(options.scope);
+                    try {
+                        return await original.call(this, qr, options);
+                    } finally {
+                        automaticScopes.delete(options.scope);
+                    }
+                }
+                if (performance.now() > mfiQuickReplyUserIntentUntil) {
                     return original.call(this, qr, options);
                 }
 
@@ -4270,14 +4330,11 @@ function mfiInstallQuickReplyGuard() {
                     return original.call(this, qr, options);
                 }
 
-                const checkRetractionTarget = action === 'retract' ? mfiTrackRetractionTarget(getStContext()) : null;
                 mfiQuickReplyUserIntentUntil = 0;
                 const confirmed = mfiQuickReplyConfirmRequest
                     ? await mfiQuickReplyConfirmRequest(action)
                     : false;
-                if (!confirmed || !mfiQuickReplyGuardActive
-                    || (checkRetractionTarget && (!checkRetractionTarget()
-                        || mfiGetQuickReplyCommandText(this, qr, options) !== commandText))) {
+                if (!confirmed || !mfiQuickReplyGuardActive) {
                     return '';
                 }
                 return original.call(this, qr, options);
@@ -4335,6 +4392,7 @@ function initGenerationConfirmGuard() {
             regenerate: ['确认重新生成此回复？', '重新生成'],
             swipe: ['确认生成备选回复？', '生成备选'],
             retract: ['确认撤回最后一条用户消息及之后的回复，并将原文放回输入框？', '回退输入'],
+            rerollSend: ['确认撤回最后一轮并用原文重新发送？', '重新发送'],
         }[action];
 
         return new Promise(function (resolve) {
@@ -4374,16 +4432,28 @@ function initGenerationConfirmGuard() {
 
     async function confirmAndReplay(event, action, element) {
         stopEvent(event);
-        const checkRetractionTarget = action === 'retract' ? mfiTrackRetractionTarget(getStContext()) : null;
         const confirmed = await requestConfirmation(action);
         if (!confirmed || destroyed || !(element instanceof HTMLElement)) {
             return;
         }
         window.setTimeout(function () {
-            if (!destroyed && (!checkRetractionTarget || checkRetractionTarget())) {
+            if (!destroyed) {
                 element.click();
             }
         }, 0);
+    }
+
+    async function confirmUmbrellaAction(action) {
+        const context = getStContext();
+        const checkRetractionTarget = action === 'regenerate' ? null : mfiTrackRetractionTarget(context);
+        if (!await requestConfirmation(action)) return false;
+        return checkRetractionTarget ? checkRetractionTarget() : mfiIsSameChat(context, getStContext());
+    }
+
+    function onUmbrellaSendReroll(event) {
+        if (event.target?.id !== 'st-tools-send-reroll' || typeof event.detail?.waitUntil !== 'function') return;
+        const action = { native: 'regenerate', send: 'rerollSend', refill: 'retract' }[event.detail.action];
+        if (typeof action === 'string') event.detail.waitUntil(confirmUmbrellaAction(action));
     }
 
     function onClick(event) {
@@ -4513,6 +4583,8 @@ function initGenerationConfirmGuard() {
         document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('touchstart', onTouchStart, true);
         document.removeEventListener('swiped-left', onSwipedLeft, true);
+        document.removeEventListener('myriad-umbrella:before-send-reroll', onUmbrellaSendReroll);
+        stopUmbrellaCommandGuard?.();
         mfiUninstallQuickReplyGuard();
         if (activePopup && typeof activePopup.completeCancelled === 'function') {
             activePopup.completeCancelled().catch(function () {
@@ -4527,7 +4599,10 @@ function initGenerationConfirmGuard() {
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('touchstart', onTouchStart, true);
     document.addEventListener('swiped-left', onSwipedLeft, true);
-    mfiInstallQuickReplyGuard();
+    document.addEventListener('myriad-umbrella:before-send-reroll', onUmbrellaSendReroll);
+    const automaticScopes = new WeakSet();
+    const stopUmbrellaCommandGuard = mfiInstallUmbrellaCommandGuard(confirmUmbrellaAction, automaticScopes);
+    mfiInstallQuickReplyGuard(automaticScopes);
 
     window.__generationConfirmGuardDestroy__ = destroy;
     mfiLog('[MobileFocus] 模块 G 生成与回退输入确认就绪');
