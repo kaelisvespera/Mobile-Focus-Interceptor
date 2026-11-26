@@ -31,7 +31,7 @@
            返回、刷新或关闭页面时显示浏览器原生确认，
            降低误触导致 ST 页面重置的风险；Chrome 安装应用模式
            额外接管侧滑返回，避免直接关闭应用。
-   模块 G：重新生成与备选生成确认（仅移动端）
+   模块 G：重新生成、备选生成与千机伞回退输入确认（仅移动端）
            在 ST 原生操作或 ST 自带快捷回复会重新生成、
            生成新备选回复前显示简洁确认；切换已有候选不受影响。
 
@@ -159,7 +159,7 @@ var MFI_FEATURE_DEFINITIONS = [
     },
     {
         id: 'generationConfirm',
-        label: '重新生成/备选回复弹窗确认',
+        label: '重新生成/备选回复/回退输入确认',
         platforms: [MFI_PLATFORM_MOBILE],
         defaultEnabled: false,
         init: initGenerationConfirmGuard,
@@ -228,7 +228,7 @@ var MFI_USAGE_HELP_GROUPS = [
         items: [
             ['chatExitConfirm', '从聊天返回主页面时弹出确认，适用于系统返回和菜单中的关闭聊天。'],
             ['exitConfirm', '刷新、关闭或侧滑返回前弹窗确认，防止误触导致页面重载。'],
-            ['generationConfirm', '重新生成或生成备选回复前弹窗确认，防止误触丢失内容或消耗额度。'],
+            ['generationConfirm', '重新生成、生成备选回复或使用千机伞回退输入前弹窗确认。'],
         ],
     },
 ];
@@ -247,7 +247,7 @@ var mfiQuickReplyGuardOriginalExecuteWithOptions = null;
 var mfiQuickReplyGuardWrappedExecuteWithOptions = null;
 var mfiQuickReplyGuardActive = false;
 var mfiQuickReplyUserIntentUntil = 0;
-var mfiGenerationConfirmRequest = null;
+var mfiQuickReplyConfirmRequest = null;
 var mfiUsageHelpOpen = false;
 
 /** 分模块的详细日志：仅 MFI_DEBUG=true 时输出 */
@@ -284,6 +284,11 @@ function getStContext() {
     } catch (error) {
         return null;
     }
+}
+
+function mfiIsSameChat(previous, current) {
+    return !!previous && !!current && previous.chatId === current.chatId && previous.characterId === current.characterId
+        && previous.groupId === current.groupId && previous.name2 === current.name2;
 }
 
 /** TT 以宿主类型为准，避免 iPadOS 等设备的桌面 UA 被判成电脑。 */
@@ -3994,9 +3999,7 @@ function initChatExitConfirmGuard() {
             if (destroyed || result !== context.POPUP_RESULT.AFFIRMATIVE || !button.isConnected || isWelcomeVisible()) {
                 return;
             }
-            const current = getStContext();
-            if (!current || current.chatId !== context.chatId || current.characterId !== context.characterId
-                || current.groupId !== context.groupId || current.name2 !== context.name2) {
+            if (!mfiIsSameChat(context, getStContext())) {
                 return;
             }
 
@@ -4025,7 +4028,7 @@ function initChatExitConfirmGuard() {
 }
 
 // ============================================================
-// 模块 G: 重新生成与备选生成确认（仅移动端）
+// 模块 G: 重新生成、备选生成与千机伞回退输入确认（仅移动端）
 // ============================================================
 
 /** 判断当前消息继续右滑时，ST 是否会真正发起新生成。 */
@@ -4080,8 +4083,8 @@ function mfiWillRightSwipeGenerate(respectAvailability) {
     return overswipeBehavior === 'regenerate';
 }
 
-/** 识别文本中会触发重新生成或新备选生成的斜线命令。 */
-function mfiGetGenerationActionFromText(text) {
+/** 识别会触发重新生成、新备选生成或千机伞回退输入的斜线命令。 */
+function mfiGetActionToConfirm(text) {
     const source = String(text ?? '').trim();
     if (!source.startsWith('/')) {
         return '';
@@ -4094,8 +4097,11 @@ function mfiGetGenerationActionFromText(text) {
             continue;
         }
         const commandName = commandMatch[1].toLowerCase();
-        if (commandName === 'regenerate' || commandName === 'regen') {
+        if (commandName === 'regenerate' || commandName === 'regen' || commandName === 'tt-reroll') {
             return 'regenerate';
+        }
+        if (commandName === 'tt-retract') {
+            return 'retract';
         }
         if (commandName === 'swipe') {
             const directionMatch = /\bdirection\s*=\s*(?:"(left|right)"|'(left|right)'|(left|right))(?=\s|$)/i.exec(segment);
@@ -4111,6 +4117,26 @@ function mfiGetGenerationActionFromText(text) {
         }
     }
     return '';
+}
+
+/** 确认期间若切换聊天、消息或草稿发生变化，撤回请求失效。 */
+function mfiTrackRetractionTarget(context) {
+    const chat = context?.chat;
+    const length = chat?.length;
+    const last = chat?.at(-1);
+    const lastText = last?.mes;
+    const userMessage = chat?.findLast?.(message => message?.is_user);
+    const userText = userMessage?.mes;
+    const composer = document.getElementById('send_textarea');
+    const draft = composer?.value;
+
+    return function () {
+        const current = getStContext();
+        return mfiIsSameChat(context, current) && current.chat === chat && chat?.length === length
+            && chat?.at(-1) === last && last?.mes === lastText
+            && chat?.findLast?.(message => message?.is_user) === userMessage && userMessage?.mes === userText
+            && document.getElementById('send_textarea') === composer && composer?.value === draft;
+    };
 }
 
 /** 文本是否通过 ST 自带的 /run 或 /qr 命令继续执行快捷回复。 */
@@ -4239,16 +4265,19 @@ function mfiInstallQuickReplyGuard() {
                 }
 
                 const commandText = mfiGetQuickReplyCommandText(this, qr, options);
-                const action = mfiGetGenerationActionFromText(commandText);
+                const action = mfiGetActionToConfirm(commandText);
                 if (!action) {
                     return original.call(this, qr, options);
                 }
 
+                const checkRetractionTarget = action === 'retract' ? mfiTrackRetractionTarget(getStContext()) : null;
                 mfiQuickReplyUserIntentUntil = 0;
-                const confirmed = mfiGenerationConfirmRequest
-                    ? await mfiGenerationConfirmRequest(action)
+                const confirmed = mfiQuickReplyConfirmRequest
+                    ? await mfiQuickReplyConfirmRequest(action)
                     : false;
-                if (!confirmed || !mfiQuickReplyGuardActive) {
+                if (!confirmed || !mfiQuickReplyGuardActive
+                    || (checkRetractionTarget && (!checkRetractionTarget()
+                        || mfiGetQuickReplyCommandText(this, qr, options) !== commandText))) {
                     return '';
                 }
                 return original.call(this, qr, options);
@@ -4301,11 +4330,12 @@ function initGenerationConfirmGuard() {
             return Promise.resolve(false);
         }
         pending = true;
-        const text = action === 'regenerate'
-            ? '确认重新生成此回复？'
-            : '确认生成备选回复？';
-        const okText = action === 'regenerate' ? '重新生成' : '生成备选';
         const context = getStContext();
+        const [text, okText] = {
+            regenerate: ['确认重新生成此回复？', '重新生成'],
+            swipe: ['确认生成备选回复？', '生成备选'],
+            retract: ['确认撤回最后一条用户消息及之后的回复，并将原文放回输入框？', '回退输入'],
+        }[action];
 
         return new Promise(function (resolve) {
             let popupResult = null;
@@ -4344,12 +4374,13 @@ function initGenerationConfirmGuard() {
 
     async function confirmAndReplay(event, action, element) {
         stopEvent(event);
+        const checkRetractionTarget = action === 'retract' ? mfiTrackRetractionTarget(getStContext()) : null;
         const confirmed = await requestConfirmation(action);
         if (!confirmed || destroyed || !(element instanceof HTMLElement)) {
             return;
         }
         window.setTimeout(function () {
-            if (!destroyed) {
+            if (!destroyed && (!checkRetractionTarget || checkRetractionTarget())) {
                 element.click();
             }
         }, 0);
@@ -4366,7 +4397,7 @@ function initGenerationConfirmGuard() {
         const sendButton = target.closest('#send_but');
         if (sendButton) {
             const text = document.getElementById('send_textarea')?.value ?? '';
-            const action = mfiGetGenerationActionFromText(text);
+            const action = mfiGetActionToConfirm(text);
             if (action && !mfiIsGenerationInProgress()) {
                 void confirmAndReplay(event, action, sendButton);
                 return;
@@ -4409,7 +4440,7 @@ function initGenerationConfirmGuard() {
             }
             if (sendOnEnter) {
                 const text = sendTextarea?.value ?? '';
-                const action = mfiGetGenerationActionFromText(text);
+                const action = mfiGetActionToConfirm(text);
                 const sendButton = document.getElementById('send_but');
                 if (action && sendButton && !mfiIsGenerationInProgress()) {
                     void confirmAndReplay(event, action, sendButton);
@@ -4477,7 +4508,7 @@ function initGenerationConfirmGuard() {
             return;
         }
         destroyed = true;
-        mfiGenerationConfirmRequest = null;
+        mfiQuickReplyConfirmRequest = null;
         document.removeEventListener('click', onClick, true);
         document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('touchstart', onTouchStart, true);
@@ -4491,7 +4522,7 @@ function initGenerationConfirmGuard() {
         window.__generationConfirmGuardInstalled__ = false;
     }
 
-    mfiGenerationConfirmRequest = requestConfirmation;
+    mfiQuickReplyConfirmRequest = requestConfirmation;
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('touchstart', onTouchStart, true);
@@ -4499,7 +4530,7 @@ function initGenerationConfirmGuard() {
     mfiInstallQuickReplyGuard();
 
     window.__generationConfirmGuardDestroy__ = destroy;
-    mfiLog('[MobileFocus] 模块 G 重新生成与备选生成确认就绪');
+    mfiLog('[MobileFocus] 模块 G 生成与回退输入确认就绪');
 }
 
 // ============================================================
@@ -4664,7 +4695,7 @@ window.__MFI_TEST_API__ = {
     syncAllFeatureRuntimes,
     getCurrentPlatform,
     isStandaloneAppMode,
-    getGenerationActionFromText: mfiGetGenerationActionFromText,
+    getGenerationActionFromText: mfiGetActionToConfirm,
     willRightSwipeGenerate: mfiWillRightSwipeGenerate,
     isQuickReplyGuardInstalled: function () {
         return !!mfiQuickReplySetPrototype;

@@ -6,7 +6,7 @@
         "clean": "cleanExtensionData"
     },
     "author": "akira",
-    "version": "1.4.1-tt.2",
+    "version": "1.4.1-tt.3",
     "debug_info": "在 index.js 顶部将 MFI_DEBUG 改为 true 开启调试日志。",
     "repository": "https://github.com/kaelisvespera/Mobile-Focus-Interceptor",
     "description": "优化 SillyTavern 和 TauriTavern 2.4.0 的移动端界面与输入体验，部分功能也适用于桌面端。"
