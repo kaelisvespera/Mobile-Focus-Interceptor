@@ -62,6 +62,7 @@ var MFI_FEATURE_DEFINITIONS = [
         id: 'focusGuard',
         label: '防止键盘频繁弹出',
         platforms: [MFI_PLATFORM_MOBILE],
+        sillyTavernOnly: true,
         init: initMobileFocusInterceptor,
         initName: 'initMobileFocusInterceptor',
         destroyName: '__mobileFocusInterceptorDestroy__',
@@ -89,6 +90,7 @@ var MFI_FEATURE_DEFINITIONS = [
         id: 'nativeHasFix',
         label: '优化键盘开合与界面流畅度',
         platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
+        sillyTavernOnly: true,
         init: initNativeHasInvalidationFix,
         initName: 'initNativeHasInvalidationFix',
         destroyName: '__nativeHasInvalidationFixDestroy__',
@@ -98,6 +100,7 @@ var MFI_FEATURE_DEFINITIONS = [
         id: 'drawerAnimation',
         label: '优化面板开合卡顿',
         platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
+        tauriHelp: '优化预设提示词弹窗和角色头像区的展开动画。顶层和常规抽屉沿用 TT 动画。',
         init: initDrawerAnimationOptimization,
         initName: 'initDrawerAnimationOptimization',
         destroyName: '__drawerAnimationOptimizationDestroy__',
@@ -116,6 +119,7 @@ var MFI_FEATURE_DEFINITIONS = [
         id: 'externalKeyboard',
         label: '防止浮窗键盘顶起界面',
         platforms: [MFI_PLATFORM_MOBILE],
+        sillyTavernOnly: true,
         init: initExternalKeyboardViewportFix,
         initName: 'initExternalKeyboardViewportFix',
         destroyName: '__externalKeyboardViewportFixDestroy__',
@@ -125,6 +129,7 @@ var MFI_FEATURE_DEFINITIONS = [
         id: 'innerUiKeyboard',
         label: '上层输入时锁定底层布局',
         platforms: [MFI_PLATFORM_MOBILE],
+        sillyTavernOnly: true,
         init: initInnerUiKeyboardLayoutFix,
         initName: 'initInnerUiKeyboardLayoutFix',
         destroyName: '__innerUiKeyboardLayoutFixDestroy__',
@@ -135,6 +140,7 @@ var MFI_FEATURE_DEFINITIONS = [
         label: '离开页面弹窗确认',
         platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
         defaultEnabled: false,
+        tauriHelp: 'Android 系统返回即将退出应用时弹出确认。刷新与关闭的确认取决于 WebView 支持。',
         init: initExitConfirmGuard,
         initName: 'initExitConfirmGuard',
         destroyName: '__exitConfirmGuardDestroy__',
@@ -182,7 +188,7 @@ var MFI_SETTING_GROUPS = [
 ];
 
 var MFI_USAGE_HELP_INTRO = [
-    '主要优化 SillyTavern 移动端的界面与输入体验，部分优化同时适用于电脑端。',
+    '主要优化 SillyTavern 和 TauriTavern 的移动端界面与输入体验，部分优化同时适用于电脑端。',
     '设置即时生效（选项旁的设备图标代表适用范围）。',
 ];
 
@@ -190,26 +196,26 @@ var MFI_USAGE_HELP_GROUPS = [
     {
         label: '输入与键盘',
         items: [
-            ['防止键盘频繁弹出', '阻止虚拟键盘自动弹出，仅主动点击输入框时允许唤起。'],
-            ['优化长文本粘贴卡顿', '减少通过虚拟键盘粘贴大量文本时的延迟与卡顿。'],
-            ['防止浮窗键盘顶起界面', '外部浮窗应用唤起键盘时，ST 主界面不再被顶起。'],
-            ['上层输入时锁定底层布局', '在世界书、角色卡等界面中呼出键盘时，锁定底层主界面不被顶起，减少不必要的布局变动与卡顿。'],
+            ['focusGuard', '阻止虚拟键盘自动弹出，仅主动点击输入框时允许唤起。'],
+            ['pastePerformance', '减少通过虚拟键盘粘贴大量文本时的延迟与卡顿。'],
+            ['externalKeyboard', '外部浮窗应用唤起键盘时，ST 主界面不再被顶起。'],
+            ['innerUiKeyboard', '在世界书、角色卡等界面中呼出键盘时，锁定底层主界面不被顶起，减少不必要的布局变动与卡顿。'],
         ],
     },
     {
         label: '界面与性能',
         items: [
-            ['优化键盘开合与界面流畅度', '解决打开抽屉或弹窗后，手机键盘弹出/收起持续卡顿以及电脑端面板操作迟缓的问题。'],
-            ['优化面板开合卡顿', '让抽屉与折叠区更快展开并瞬间收起，减少画面掉帧与跳动。'],
-            ['角色收藏头像缓存', '减少重复打开角色管理面板时不必要的扫描和刷新。'],
-            ['优化 Token 计数器卡顿', '优化长文本的分词高亮渲染，避免页面卡顿与假死，分词结果过长时分段加载。'],
+            ['nativeHasFix', '解决打开抽屉或弹窗后，手机键盘弹出/收起持续卡顿以及电脑端面板操作迟缓的问题。'],
+            ['drawerAnimation', '让抽屉与折叠区更快展开并瞬间收起，减少画面掉帧与跳动。'],
+            ['hotswapCache', '减少重复打开角色管理面板时不必要的扫描和刷新。'],
+            ['tokenCounter', '优化长文本的分词高亮渲染，避免页面卡顿与假死，分词结果过长时分段加载。'],
         ],
     },
     {
         label: '防误触保护',
         items: [
-            ['离开页面弹窗确认', '刷新、关闭或侧滑返回前弹窗确认，防止误触导致页面重载。'],
-            ['重新生成/备选回复弹窗确认', '重新生成或生成备选回复前弹窗确认，防止误触丢失内容或消耗额度。'],
+            ['exitConfirm', '刷新、关闭或侧滑返回前弹窗确认，防止误触导致页面重载。'],
+            ['generationConfirm', '重新生成或生成备选回复前弹窗确认，防止误触丢失内容或消耗额度。'],
         ],
     },
 ];
@@ -267,8 +273,12 @@ function getStContext() {
     }
 }
 
-/** 与 ST 原生 isMobile() 保持一致：手机和平板归入 mobile，其余归入 desktop。 */
+/** TT 以宿主类型为准，避免 iPadOS 等设备的桌面 UA 被判成电脑。 */
 function getCurrentPlatform() {
+    const hostKind = window.__TAURITAVERN_HOST__?.kind;
+    if (hostKind === MFI_PLATFORM_MOBILE || hostKind === MFI_PLATFORM_DESKTOP) {
+        return hostKind;
+    }
     const context = getStContext();
     if (context && typeof context.isMobile === 'function') {
         try {
@@ -424,6 +434,10 @@ function getFeatureDefinition(featureId) {
     return MFI_FEATURE_DEFINITIONS.find(function (definition) {
         return definition.id === featureId;
     }) || null;
+}
+
+function isFeatureAvailable(definition) {
+    return !definition.sillyTavernOnly || !window.__TAURITAVERN_HOST__;
 }
 
 function getPlatformControlText(platform, featureLabel) {
@@ -589,6 +603,12 @@ function buildUsageHelpContent() {
         content.appendChild(paragraph);
     });
 
+    if (window.__TAURITAVERN_HOST__) {
+        const note = document.createElement('p');
+        note.textContent = 'TauriTavern 使用自身的输入聚焦、键盘布局和常规抽屉动画。';
+        content.appendChild(note);
+    }
+
     MFI_USAGE_HELP_GROUPS.forEach(function (group) {
         const section = document.createElement('section');
         section.className = 'flex-container flexFlowColumn';
@@ -605,11 +625,17 @@ function buildUsageHelpContent() {
         list.style.lineHeight = '1.55';
 
         group.items.forEach(function (item) {
+            const definition = getFeatureDefinition(item[0]);
+            if (!isFeatureAvailable(definition)) {
+                return;
+            }
             const listItem = document.createElement('li');
             listItem.style.marginBottom = '.3em';
             const name = document.createElement('strong');
-            name.textContent = item[0] + '：';
-            listItem.append(name, document.createTextNode(item[1]));
+            name.textContent = definition.label + '：';
+            const description = window.__TAURITAVERN_HOST__ && definition.tauriHelp
+                ? definition.tauriHelp : item[1];
+            listItem.append(name, document.createTextNode(description));
             list.appendChild(listItem);
         });
 
@@ -732,7 +758,7 @@ function createSettingsPanelContent() {
 
         group.featureIds.forEach(function (featureId) {
             const definition = getFeatureDefinition(featureId);
-            if (!definition) {
+            if (!definition || !isFeatureAvailable(definition)) {
                 return;
             }
             const row = document.createElement('div');
@@ -938,6 +964,8 @@ function initPastePerformanceFix() {
 
     window.__pastePerformanceFixInstalled__ = true;
 
+    var isTauriTavern = !!window.__TAURITAVERN_HOST__;
+
     // --- 核心状态 ---
     var burstTimestamps = [];
     var hasSubstantialText = false;
@@ -956,10 +984,10 @@ function initPastePerformanceFix() {
     /** 等待 rAF 恢复并派发 input 的目标元素 */
     var rafTarget = null;
 
-    /** 判断元素是否为可输入的 textarea/input/contenteditable */
+    /** TT 助手的受控输入框由 React 管理，保留其原生输入事件。 */
     function isEditable(el) {
-        // 只用 value 语义完整的元素：contenteditable 无 .value，拦截后无法写入
-        return el.tagName === 'TEXTAREA' || el.tagName === 'INPUT';
+        return (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')
+            && (!isTauriTavern || !el.closest('#tt-assistant'));
     }
 
     /**
@@ -1006,10 +1034,12 @@ function initPastePerformanceFix() {
         pasteStartPos = null;
         pasteTarget = null;
 
-        // 隐藏目标元素，避免 value 赋值期间的重绘
-        target.style.visibility = 'hidden';
+        // TT 的原生键盘跟随焦点，粘贴时保留输入框可见性。
+        if (!isTauriTavern) {
+            target.style.visibility = 'hidden';
+        }
 
-        // 一次性写入文本（内部做字形布局，但不重绘）
+        // 一次性写入文本
         target.value = before + accumulatedText + after;
         var newPos = start + accumulatedText.length;
         if (typeof target.setSelectionRange === 'function') {
@@ -1026,7 +1056,9 @@ function initPastePerformanceFix() {
         }
 
         function restoreAndDispatch() {
-            target.style.visibility = '';
+            if (!isTauriTavern) {
+                target.style.visibility = '';
+            }
             target.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
@@ -1046,14 +1078,14 @@ function initPastePerformanceFix() {
 
     /**
      * beforeinput 事件处理器（document capture 阶段）
-     * 对所有 textarea/input/contenteditable 生效
+     * 对支持选区的 textarea/input 生效
      */
     function onBeforeInputCapture(e) {
         var target = e.target;
         if (!isEditable(target)) return;
 
-        // 不拦截 IME 组合输入
-        if (e.isComposing) return;
+        // 让输入法处理组合输入和不可取消的事件，避免重复写入。
+        if (e.isComposing || !e.cancelable || target.selectionStart === null) return;
 
         var textInsertTypes = ['insertText', 'insertFromPaste', 'insertCompositionText', 'insertReplacementText'];
         if (textInsertTypes.indexOf(e.inputType) === -1) {
@@ -1161,7 +1193,13 @@ function initPastePerformanceFix() {
 
     function onInputCapture(e) {
         var target = e.target;
-        if (!isEditable(target)) return;
+        if (!isEditable(target) || e.isComposing) return;
+        // TT 用普通 input 事件同步聊天草稿，立即交给宿主处理。
+        if (isTauriTavern && e.inputType !== 'insertFromPaste') {
+            lastInputTarget = target;
+            lastValueLength = target.value.length;
+            return;
+        }
         if (batching) return;
 
         // 不同元素，重置 lastValueLength
@@ -1198,12 +1236,14 @@ function initPastePerformanceFix() {
             cancelAnimationFrame(rafId);
             rafId = null;
             if (rafTarget) {
-                rafTarget.style.visibility = '';
+                if (!isTauriTavern) {
+                    rafTarget.style.visibility = '';
+                }
                 rafTarget.dispatchEvent(new Event('input', { bubbles: true }));
                 rafTarget = null;
             }
         }
-        if (pasteTarget) pasteTarget.style.visibility = '';
+        if (!isTauriTavern && pasteTarget) pasteTarget.style.visibility = '';
         document.removeEventListener('beforeinput', onBeforeInputCapture, true);
         document.removeEventListener('input', onInputCapture, true);
         window.__pastePerformanceFixInstalled__ = false;
@@ -2360,6 +2400,7 @@ function initDrawerAnimationOptimization() {
     }
     window.__drawerAnimationOptimizationInstalled__ = true;
 
+    var isTauriTavern = !!window.__TAURITAVERN_HOST__;
     var jq = window.jQuery;
     var originalSlideToggle = jq && jq.fn ? jq.fn.slideToggle : null;
     var originalSlideDown = jq && jq.fn ? jq.fn.slideDown : null;
@@ -2373,6 +2414,11 @@ function initDrawerAnimationOptimization() {
     var INLINE_REVEAL_CLASS = 'mfi-inline-drawer-reveal';
     var DORMANT_OPEN_CLASS = 'mfi-drawer-reveal-dormant';
     var STYLE_ID = 'mfi-drawer-animation-style';
+    // TT 已为顶层和常规抽屉提供裁切动画，插件只处理仍走 jQuery 的面板。
+    var revealSelectors = isTauriTavern ? [PROMPT_POPUP_SELECTOR] : [DRAWER_SELECTOR, PROMPT_POPUP_SELECTOR];
+    var openRevealSelectors = revealSelectors.map(function (selector) {
+        return selector + '.openDrawer';
+    });
     var moduleActive = false;
     var dormantOpenElements = new Set();
     var dormantOpenObserver = new MutationObserver(function (mutations) {
@@ -2389,7 +2435,7 @@ function initDrawerAnimationOptimization() {
     });
 
     /* 功能启用时，已经打开的抽屉保持原状；等它关闭后，再次打开才播放新动画。 */
-    document.querySelectorAll(DRAWER_SELECTOR + '.openDrawer, ' + PROMPT_POPUP_SELECTOR + '.openDrawer')
+    document.querySelectorAll(openRevealSelectors.join(', '))
         .forEach(function (element) {
             element.classList.add(DORMANT_OPEN_CLASS);
             dormantOpenElements.add(element);
@@ -2402,12 +2448,12 @@ function initDrawerAnimationOptimization() {
     var styleEl = document.createElement('style');
     styleEl.id = STYLE_ID;
     styleEl.textContent = [
-        DRAWER_SELECTOR + ',',
-        PROMPT_POPUP_SELECTOR + ' {',
+        revealSelectors.join(', ') + ' {',
         '    transition: none !important;',
         '}',
-        DRAWER_SELECTOR + '.openDrawer:not(.' + DORMANT_OPEN_CLASS + '),',
-        PROMPT_POPUP_SELECTOR + '.openDrawer:not(.' + DORMANT_OPEN_CLASS + ') {',
+        openRevealSelectors.map(function (selector) {
+            return selector + ':not(.' + DORMANT_OPEN_CLASS + ')';
+        }).join(', ') + ' {',
         '    animation-name: mfi-drawer-reveal !important;',
         '    animation-duration: calc(var(--animation-duration-2x, 250ms) * 0.8) !important;',
         '    animation-timing-function: ease-in-out !important;',
@@ -2454,7 +2500,9 @@ function initDrawerAnimationOptimization() {
                 }
             });
     }
-    document.addEventListener('click', onDrawerToggleClick, true);
+    if (!isTauriTavern) {
+        document.addEventListener('click', onDrawerToggleClick, true);
+    }
 
     /* 预设编辑弹窗由 ST 调用 jQuery slideDown 逐帧改变高度。这里保留
        打开和关闭 API，只把打开动作改为立即完成，再由同一个裁切动画揭示，
@@ -2539,7 +2587,7 @@ function initDrawerAnimationOptimization() {
             applyAvatarBlockToggle(target);
             return this;
         }
-        var patch = findInlinePatch(this[0]);
+        var patch = isTauriTavern ? null : findInlinePatch(target);
         if (patch) {
             applyInlinePatch(patch);
             return this;
@@ -2591,8 +2639,10 @@ function initDrawerAnimationOptimization() {
 
     if (originalSlideToggle) {
         jq.fn.slideToggle = wrappedInlineSlideToggle;
-        window.addEventListener('click', onInlineDrawerClickCapture, true);
-        window.addEventListener('click', onInlineDrawerClickBubble, false);
+        if (!isTauriTavern) {
+            window.addEventListener('click', onInlineDrawerClickCapture, true);
+            window.addEventListener('click', onInlineDrawerClickBubble, false);
+        }
     }
 
     function destroy() {
@@ -3752,6 +3802,15 @@ function initExitConfirmGuard() {
     let closeWatcherResetTimer = null;
     let bypassBeforeUnload = false;
     let exitRequested = false;
+    const nativeBackHandler = window.__TAURITAVERN_HANDLE_BACK__;
+
+    function confirmAndroidExit() {
+        const handled = nativeBackHandler.call(this);
+        if (handled || destroyed) {
+            return handled;
+        }
+        return !window.confirm('确认退出 TauriTavern？');
+    }
 
     function onBeforeUnload(event) {
         /* 已通过独立应用确认框确认离开，不再重复弹出浏览器离开提示。 */
@@ -3868,10 +3927,16 @@ function initExitConfirmGuard() {
         bypassBeforeUnload = false;
         exitRequested = false;
         window.removeEventListener('beforeunload', onBeforeUnload);
+        if (window.__TAURITAVERN_HANDLE_BACK__ === confirmAndroidExit) {
+            window.__TAURITAVERN_HANDLE_BACK__ = nativeBackHandler;
+        }
         window.__exitConfirmGuardInstalled__ = false;
     }
 
     window.addEventListener('beforeunload', onBeforeUnload);
+    if (window.__TAURITAVERN_HOST__?.platform === 'android' && typeof nativeBackHandler === 'function') {
+        window.__TAURITAVERN_HANDLE_BACK__ = confirmAndroidExit;
+    }
     installCloseWatcher();
     window.__exitConfirmGuardDestroy__ = destroy;
     mfiLog('[MobileFocus] 模块 F 离开页面前原生确认就绪');
@@ -4242,13 +4307,12 @@ function initGenerationConfirmGuard() {
     }
 
     function onKeyDown(event) {
-        if (!event.isTrusted) {
+        if (!event.isTrusted || event.isComposing || event.keyCode === 229) {
             return;
         }
 
         const sendTextarea = document.getElementById('send_textarea');
         if (event.key === 'Enter'
-            && !event.isComposing
             && !event.shiftKey
             && !event.ctrlKey
             && !event.altKey
@@ -4365,7 +4429,7 @@ function isFeatureRuntimeInstalled(definition) {
 }
 
 function shouldRunFeature(definition) {
-    if (!mfiSettingsLoaded || !mfiSettings || mfiSettings.masterEnabled === false) {
+    if (!isFeatureAvailable(definition) || !mfiSettingsLoaded || !mfiSettings || mfiSettings.masterEnabled === false) {
         return false;
     }
     const platform = getCurrentPlatform();
@@ -4439,16 +4503,7 @@ function bindPageLifecycle() {
 
 /** 直接启动全部模块，保留给单独模块测试使用。 */
 function startAllModules() {
-    initMobileFocusInterceptor();
-    initPastePerformanceFix();
-    initTokenCounterRenderFix();
-    initNativeHasInvalidationFix();
-    initDrawerAnimationOptimization();
-    initHotswapCacheOptimization();
-    initExternalKeyboardViewportFix();
-    initInnerUiKeyboardLayoutFix();
-    initExitConfirmGuard();
-    initGenerationConfirmGuard();
+    MFI_FEATURE_DEFINITIONS.filter(isFeatureAvailable).forEach(startFeatureRuntime);
     mfiLogLoaded();
 }
 
