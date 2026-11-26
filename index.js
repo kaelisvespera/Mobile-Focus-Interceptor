@@ -136,6 +136,17 @@ var MFI_FEATURE_DEFINITIONS = [
         installedFlag: '__innerUiKeyboardLayoutFixInstalled__',
     },
     {
+        id: 'chatExitConfirm',
+        label: '返回主页面前确认',
+        platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
+        defaultEnabled: false,
+        tauriTavernOnly: true,
+        init: initChatExitConfirmGuard,
+        initName: 'initChatExitConfirmGuard',
+        destroyName: '__chatExitConfirmGuardDestroy__',
+        installedFlag: '__chatExitConfirmGuardInstalled__',
+    },
+    {
         id: 'exitConfirm',
         label: '离开页面弹窗确认',
         platforms: [MFI_PLATFORM_MOBILE, MFI_PLATFORM_DESKTOP],
@@ -181,6 +192,7 @@ var MFI_SETTING_GROUPS = [
     {
         label: '防误触保护',
         featureIds: [
+            'chatExitConfirm',
             'exitConfirm',
             'generationConfirm',
         ],
@@ -214,6 +226,7 @@ var MFI_USAGE_HELP_GROUPS = [
     {
         label: '防误触保护',
         items: [
+            ['chatExitConfirm', '从聊天返回主页面时弹出确认，适用于系统返回和菜单中的关闭聊天。'],
             ['exitConfirm', '刷新、关闭或侧滑返回前弹窗确认，防止误触导致页面重载。'],
             ['generationConfirm', '重新生成或生成备选回复前弹窗确认，防止误触丢失内容或消耗额度。'],
         ],
@@ -437,7 +450,7 @@ function getFeatureDefinition(featureId) {
 }
 
 function isFeatureAvailable(definition) {
-    return !definition.sillyTavernOnly || !window.__TAURITAVERN_HOST__;
+    return window.__TAURITAVERN_HOST__ ? !definition.sillyTavernOnly : !definition.tauriTavernOnly;
 }
 
 function getPlatformControlText(platform, featureLabel) {
@@ -3940,6 +3953,75 @@ function initExitConfirmGuard() {
     installCloseWatcher();
     window.__exitConfirmGuardDestroy__ = destroy;
     mfiLog('[MobileFocus] 模块 F 离开页面前原生确认就绪');
+}
+
+// TT 的系统返回和菜单复用同一个关闭聊天入口。
+function initChatExitConfirmGuard() {
+    let activePopup = null;
+    let replayTarget = null;
+    let destroyed = false;
+
+    function isWelcomeVisible() {
+        return mfiIsVisibleElement(document.querySelector('#chat > div.welcomePanel'));
+    }
+
+    async function onCloseChat(event) {
+        const button = event.target instanceof Element ? event.target.closest('#option_close_chat') : null;
+        if (!button || button === replayTarget || isWelcomeVisible()) {
+            return;
+        }
+        // jQuery 已处理命令的 .trigger()，随后生成的 DOM 点击不会再次传给宿主。
+        if (window.jQuery?.event?.triggered === event.type) {
+            return;
+        }
+        const context = getStContext();
+        if (!context?.Popup || !context.POPUP_TYPE || !context.POPUP_RESULT) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (activePopup) {
+            return;
+        }
+        try {
+            activePopup = new context.Popup('确认关闭当前聊天并返回主页面？', context.POPUP_TYPE.CONFIRM, '', {
+                okButton: '返回主页面',
+                cancelButton: '继续聊天',
+                defaultResult: context.POPUP_RESULT.NEGATIVE,
+            });
+            const result = await activePopup.show();
+            if (destroyed || result !== context.POPUP_RESULT.AFFIRMATIVE || !button.isConnected || isWelcomeVisible()) {
+                return;
+            }
+            const current = getStContext();
+            if (!current || current.chatId !== context.chatId || current.characterId !== context.characterId
+                || current.groupId !== context.groupId || current.name2 !== context.name2) {
+                return;
+            }
+
+            replayTarget = button;
+            button.click();
+        } catch (error) {
+            console.warn('[MobileFocus] 无法完成返回主页面确认：', error);
+        } finally {
+            replayTarget = null;
+            activePopup = null;
+        }
+    }
+
+    document.addEventListener('click', onCloseChat, true);
+    window.__chatExitConfirmGuardInstalled__ = true;
+    window.__chatExitConfirmGuardDestroy__ = function () {
+        destroyed = true;
+        document.removeEventListener('click', onCloseChat, true);
+        if (activePopup) {
+            activePopup.completeCancelled().catch(function () {
+                /* 弹窗可能已经随页面关闭。 */
+            });
+        }
+        window.__chatExitConfirmGuardInstalled__ = false;
+    };
 }
 
 // ============================================================

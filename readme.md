@@ -12,6 +12,8 @@
 
 启用离开确认后，Android 系统返回先由 TT 处理。只有即将退出应用时才弹出确认。刷新和关闭页面的确认取决于 WebView 的 `beforeunload` 支持。
 
+在扩展设置的「防误触保护」中开启「返回主页面前确认」，即可在系统返回或打开菜单点击「关闭聊天」时选择继续聊天或回到主页面。这个开关独立于退出应用确认，默认关闭。
+
 适配基线为 TT 2.4.0 热修版 [`fff9af0`](https://github.com/Darkatse/TauriTavern/releases/tag/v2.4.0)。原项目见 [akira59851/Mobile-Focus-Interceptor](https://github.com/akira59851/Mobile-Focus-Interceptor)。
 
 ## SillyTavern 功能
@@ -52,6 +54,10 @@
 - 仅适用于移动端的功能不会在电脑端加载。
 
 ## 更新日志
+
+### [v1.4.1-tt.2]
+
+- 新增 TT「返回主页面前确认」，覆盖关闭聊天菜单和系统返回到主页面的操作。
 
 ### [v1.4.1-tt.1]
 
